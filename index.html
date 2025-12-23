@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dual Mode Editor: HTML & Python</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #475569;
+            --success: #16a34a;
+            --bg-dark: #1e293b;
+            --text-light: #f8fafc;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #f1f5f9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- HEADER RESPONSIVE --- */
+        header {
+            background-color: white;
+            padding: 10px 15px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 60px; 
+            z-index: 10;
+            flex-wrap: wrap; 
+            gap: 10px;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        select {
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        /* Buttons Colors */
+        .btn-upload { background-color: var(--secondary); color: white; }
+        .btn-run { background-color: var(--success); color: white; }
+        .btn-save { background-color: var(--primary); color: white; }
+        .btn-clear { background-color: #ef4444; color: white; }
+        .btn-fullscreen { background-color: #64748b; color: white; }
+
+        /* --- WORKSPACE LAYOUT --- */
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px); 
+            position: relative;
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            min-width: 0; 
+        }
+
+        #editor {
+            position: absolute;
+            top: 0; right: 0; bottom: 30px; 
+            left: 0;
+            font-size: 14px; 
+        }
+
+        .editor-info-bar {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 30px;
+            background-color: #f1f5f9;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            font-size: 11px;
+            color: #64748b;
+            font-family: monospace;
+        }
+
+        .output-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            position: relative;
+            min-width: 0;
+        }
+
+        .output-header {
+            padding: 8px 15px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* IFRAME UPDATED: Permission Attributes */
+        #htmlPreview { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
+            background: white;
+            display: block;
+        }
+        
+        #pythonConsole {
+            display: none;
+            flex: 1;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px; 
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: none;
+            z-index: 20;
+        }
+
+        @media screen and (max-width: 768px) {
+            header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                padding: 10px;
+            }
+            .logo { justify-content: center; margin-bottom: 5px; }
+            .controls { justify-content: center; gap: 5px; }
+            .controls button, .controls select {
+                flex: 1 1 auto; justify-content: center; font-size: 12px; padding: 8px 5px;
+            }
+            .workspace { flex-direction: column; }
+            .editor-container {
+                border-right: none; border-bottom: 4px solid #e2e8f0; height: 50%; flex: none; 
+            }
+            .output-container { height: 50%; flex: 1; }
+            .btn-run { overflow: hidden; text-overflow: ellipsis; }
+        }
+
+        #dropOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(37, 99, 235, 0.9);
+            z-index: 999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            border: 5px dashed white;
+            text-align: center;
+        }
+        #dropOverlay h2 { font-size: 1.5rem; pointer-events: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="dropOverlay">
+        <h2>Drop File Here</h2>
+        <p>(Supports .html & .py)</p>
+    </div>
+
+    <input type="file" id="fileInput" accept=".html,.htm,.py" hidden>
+
+    <header>
+        <div class="logo">
+            <span>&lt;/&gt;</span> ProCode
+        </div>
+        <div class="controls">
+            <select id="modeSelector">
+                <option value="html">HTML</option>
+                <option value="python">Python</option>
+            </select>
+            
+            <button class="btn-upload" onclick="document.getElementById('fileInput').click()" title="Open File">
+                📂 Open
+            </button>
+            <button class="btn-clear" onclick="clearEditor()" title="Clear Editor">
+                🗑 Clear
+            </button>
+            <button class="btn-run" onclick="runCode()" title="Run Code">
+                ▶ Run/Reload
+            </button>
+            <button class="btn-save" onclick="saveCode()" title="Save File">
+                💾 Save
+            </button>
+            <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()" title="Fullscreen Preview">
+                ⛶ Fullscreen
+            </button>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="editor-container">
+            <div id="editor"></div>
+            <div class="editor-info-bar">
+                <span id="fileSizeInfo">0 Bytes</span>
+            </div>
+        </div>
+
+        <div class="output-container">
+            <div class="output-header">
+                <span id="outputTitle">Web Preview</span>
+                <span id="statusText" style="font-weight: normal; font-size: 0.8em; color: #64748b;">Ready</span>
+            </div>
+            
+            <iframe id="htmlPreview" 
+                sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin allow-downloads"
+                allow="accelerometer; camera; encrypted-media; display-capture; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; web-share; bluetooth; serial"
+                allowfullscreen="true">
+            </iframe>
+            
+            <pre id="pythonConsole"></pre>
+            <div id="loading" class="loading">Processing...</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Setup Editor ---
+        const editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/html"); 
+        editor.setOptions({
+            fontSize: "11pt", 
+            enableBasicAutocompletion: true,
+            enableLiveAutocompletion: true,
+            showPrintMargin: false,
+            wrap: true
+        });
+
+        const modeSelector = document.getElementById('modeSelector');
+        const htmlPreview = document.getElementById('htmlPreview');
+        const pythonConsole = document.getElementById('pythonConsole');
+        const outputTitle = document.getElementById('outputTitle');
+        const statusText = document.getElementById('statusText');
+        const loading = document.getElementById('loading');
+        const dropOverlay = document.getElementById('dropOverlay');
+        const fileInput = document.getElementById('fileInput');
+        const fileSizeInfo = document.getElementById('fileSizeInfo');
+        const btnFullscreen = document.getElementById('btnFullscreen');
+
+        // --- 2. File Size Logic ---
+        function updateFileSize() {
+            const content = editor.getValue();
+            const bytes = new Blob([content]).size;
+            let sizeStr = bytes + " B";
+            if (bytes > 1024) sizeStr = (bytes / 1024).toFixed(1) + " KB";
+            if (bytes > 1024 * 1024) sizeStr = (bytes / (1024 * 1024)).toFixed(1) + " MB";
+            fileSizeInfo.textContent = "Size: " + sizeStr;
+        }
+        editor.session.on('change', updateFileSize);
+
+        // --- 3. Mode Switch Logic ---
+        function switchMode(mode, keepContent = false) {
+            modeSelector.value = mode;
+            htmlPreview.srcdoc = "";
+            pythonConsole.textContent = "";
+
+            if (mode === 'html') {
+                editor.session.setMode("ace/mode/html");
+                if(!keepContent) editor.setValue(""); 
+                htmlPreview.style.display = 'block';
+                pythonConsole.style.display = 'none';
+                outputTitle.textContent = "Web Preview";
+                btnFullscreen.style.display = 'flex'; 
+            } else {
+                editor.session.setMode("ace/mode/python");
+                if(!keepContent) editor.setValue("");
+                htmlPreview.style.display = 'none';
+                pythonConsole.style.display = 'block';
+                outputTitle.textContent = "Terminal";
+                pythonConsole.textContent = ">>> Waiting for code...";
+                btnFullscreen.style.display = 'none';
+            }
+            editor.clearSelection();
+            updateFileSize();
+        }
+
+        modeSelector.addEventListener('change', function() {
+            switchMode(this.value, false);
+        });
+
+        // --- 4. Fullscreen ---
+        function toggleFullscreen() {
+            const iframe = document.getElementById('htmlPreview');
+            if (!document.fullscreenElement) {
+                if (iframe.requestFullscreen) iframe.requestFullscreen();
+                else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
+                else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // --- 5. Upload & Drag Drop ---
+        function handleFile(file) {
+            if (!file) return;
+            const name = file.name.toLowerCase();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const content = e.target.result;
+                if (name.endsWith('.html') || name.endsWith('.htm')) {
+                    switchMode('html', true); 
+                    editor.setValue(content);
+                    statusText.textContent = "Loaded HTML file";
+                } else if (name.endsWith('.py')) {
+                    switchMode('python', true); 
+                    editor.setValue(content);
+                    statusText.textContent = "Loaded Python file";
+                } else {
+                    alert("Invalid format! Use .html or .py");
+                }
+                editor.clearSelection();
+            };
+            reader.readAsText(file);
+        }
+
+        fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); this.value = ''; });
+
+        window.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'flex'; });
+        window.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); if (e.clientX === 0 || e.clientY === 0) dropOverlay.style.display = 'none'; });
+        window.addEventListener('drop', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'none'; if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+        dropOverlay.addEventListener('dragleave', function(e) { dropOverlay.style.display = 'none'; });
+        dropOverlay.addEventListener('drop', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'none'; if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+
+        // --- 6. Run & Save ---
+        function runCode() {
+            const mode = modeSelector.value;
+            const code = editor.getValue();
+
+            if (mode === 'html') {
+                htmlPreview.srcdoc = code;
+                statusText.textContent = "Updated: " + new Date().toLocaleTimeString();
+            } else {
+                runPython(code);
+            }
+        }
+
+        function runPython(prog) {
+            pythonConsole.textContent = ""; 
+            loading.style.display = 'block';
+            statusText.textContent = "Running...";
+
+            Sk.configure({
+                output: function(text) { pythonConsole.textContent += text; },
+                read: function(x) {
+                    if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
+                        throw "File not found: '" + x + "'";
+                    return Sk.builtinFiles["files"][x];
+                }
+            });
+
+            Sk.misceval.asyncToPromise(function() {
+                return Sk.importMainWithBody("<stdin>", false, prog, true);
+            }).then(function(mod) {
+                loading.style.display = 'none';
+                statusText.textContent = "Done";
+                pythonConsole.textContent += "\n\n[Finished]";
+            }, function(err) {
+                loading.style.display = 'none';
+                statusText.textContent = "Error";
+                pythonConsole.textContent += "\nError: " + err.toString();
+            });
+        }
+
+        function saveCode() {
+            const mode = modeSelector.value;
+            const code = editor.getValue();
+            let filename = mode === 'html' ? "index.html" : "main.py";
+            let type = mode === 'html' ? "text/html" : "text/plain";
+
+            const blob = new Blob([code], { type: type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function clearEditor() {
+            if(confirm("Are you sure you want to clear the editor?")) {
+                editor.setValue("");
+                htmlPreview.srcdoc = ""; 
+                if(modeSelector.value === 'python') pythonConsole.textContent = "";
+            }
+        }
+
+        // Init
+        switchMode('html', false);
+
+    </script>
+</body>
+</html>
