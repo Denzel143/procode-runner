@@ -3,462 +3,631 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dual Mode Editor: HTML & Python</title>
+    <title>ProCode: Future Editor v4 (ZIP Edition)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #2563eb;
-            --secondary: #475569;
-            --success: #16a34a;
-            --bg-dark: #1e293b;
-            --text-light: #f8fafc;
+            --bg-deep: #050509;
+            --bg-panel: rgba(20, 20, 35, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --primary-gradient: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+            --accent-glow: #00c6ff;
+            --secondary-text: #94a3b8;
+            --text-light: #f1f5f9;
+            --success: #00d26a;
+            --danger: #f8312f;
+            --font-main: 'Outfit', sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
         
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background-color: #f1f5f9;
+            font-family: var(--font-main);
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 114, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(121, 40, 202, 0.15) 0%, transparent 40%);
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            position: relative;
+            color: var(--text-light);
         }
 
-        /* --- HEADER RESPONSIVE --- */
+        /* --- HEADER --- */
         header {
-            background-color: white;
-            padding: 10px 15px;
-            border-bottom: 1px solid #e2e8f0;
+            background: rgba(10, 10, 16, 0.6);
+            backdrop-filter: blur(12px);
+            padding: 0 20px;
+            border-bottom: 1px solid var(--glass-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            min-height: 60px; 
-            z-index: 10;
-            flex-wrap: wrap; 
-            gap: 10px;
+            height: 70px; 
+            z-index: 50;
         }
 
         .logo {
-            font-weight: 800;
-            font-size: 1.2rem;
-            color: var(--bg-dark);
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: white;
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
+            gap: 12px;
+            text-shadow: 0 0 15px rgba(0, 198, 255, 0.5);
         }
+        .logo i { color: var(--accent-glow); }
 
-        .controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
+        .controls { display: flex; gap: 10px; align-items: center; }
 
         select {
-            padding: 8px 10px;
-            border-radius: 6px;
-            border: 1px solid #cbd5e1;
+            padding: 8px 15px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-light);
+            font-family: var(--font-main);
             font-weight: 600;
             cursor: pointer;
-            font-size: 13px;
+            transition: 0.3s;
         }
+        select:hover { border-color: var(--accent-glow); background: rgba(255,255,255,0.1); }
+        select option { background: #1e1e2e; color: white; }
+
+        #subModeContainer { display: none; border-left: 1px solid var(--glass-border); padding-left: 10px; }
 
         button {
-            padding: 8px 12px;
+            padding: 9px 16px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 0.85rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
             display: flex;
             align-items: center;
-            gap: 5px;
-            white-space: nowrap;
+            gap: 8px;
+            color: white;
+            font-family: var(--font-main);
         }
 
-        /* Buttons Colors */
-        .btn-upload { background-color: var(--secondary); color: white; }
-        .btn-run { background-color: var(--success); color: white; }
-        .btn-save { background-color: var(--primary); color: white; }
-        .btn-clear { background-color: #ef4444; color: white; }
-        .btn-fullscreen { background-color: #64748b; color: white; }
+        .btn-upload { background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); }
+        .btn-upload:hover { background: rgba(255,255,255,0.2); }
+        .btn-clear { background: rgba(248, 49, 47, 0.15); border: 1px solid rgba(248, 49, 47, 0.3); color: #ff8080; }
+        .btn-run { background: var(--primary-gradient); box-shadow: 0 0 15px rgba(0, 114, 255, 0.4); }
+        .btn-run:hover { transform: translateY(-2px); box-shadow: 0 0 25px rgba(0, 114, 255, 0.6); }
+        .btn-save { background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); }
+        .btn-fullscreen { background: transparent; border: 1px solid var(--glass-border); }
 
-        /* --- WORKSPACE LAYOUT --- */
+        /* --- WORKSPACE --- */
         .workspace {
             display: flex;
             flex: 1;
-            height: calc(100vh - 60px); 
-            position: relative;
+            height: calc(100vh - 70px);
+            padding: 15px;
+            gap: 15px;
         }
 
-        .editor-container {
+        .editor-container, .output-container {
             flex: 1;
-            position: relative;
-            border-right: 1px solid #e2e8f0;
             display: flex;
             flex-direction: column;
-            min-width: 0; 
+            background: var(--bg-panel);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
         }
 
-        #editor {
-            position: absolute;
-            top: 0; right: 0; bottom: 30px; 
-            left: 0;
-            font-size: 14px; 
+        /* Tabs for Separated Mode */
+        .editor-tabs {
+            display: none; /* Hidden by default */
+            height: 40px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--glass-border);
+            align-items: center;
+            padding: 0 10px;
+            gap: 5px;
         }
+        
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--secondary-text);
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-family: var(--font-main);
+        }
+        .tab-btn:hover { background: rgba(255,255,255,0.05); color: white; }
+        .tab-btn.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--accent-glow);
+            font-weight: 700;
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Editors */
+        .ace-wrapper {
+            position: relative;
+            flex: 1;
+            display: block; /* Managed via JS */
+            width: 100%;
+        }
+
+        #editorMain, #editorCSS, #editorJS {
+            position: absolute;
+            top: 0; right: 0; bottom: 30px; left: 0;
+            background-color: transparent !important;
+        }
+        
+        .ace_gutter { background: rgba(0,0,0,0.2) !important; color: #64748b !important; }
 
         .editor-info-bar {
             position: absolute;
             bottom: 0; left: 0; right: 0;
             height: 30px;
-            background-color: #f1f5f9;
-            border-top: 1px solid #e2e8f0;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
+            justify-content: flex-end;
             padding: 0 15px;
             font-size: 11px;
-            color: #64748b;
-            font-family: monospace;
+            color: var(--secondary-text);
+            font-family: var(--font-code);
+            z-index: 10;
         }
 
-        .output-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: white;
-            position: relative;
-            min-width: 0;
-        }
-
+        /* Output */
         .output-header {
-            padding: 8px 15px;
-            background-color: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-            font-size: 0.85rem;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 0.9rem;
             font-weight: 600;
-            color: var(--secondary);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
-        /* IFRAME UPDATED: Permission Attributes */
-        #htmlPreview { 
-            width: 100%; 
-            height: 100%; 
-            border: none; 
-            background: white;
-            display: block;
-        }
         
+        #htmlPreview { width: 100%; height: 100%; border: none; background: white; }
         #pythonConsole {
-            display: none;
-            flex: 1;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            padding: 15px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 12px; 
+            display: none; flex: 1; background-color: #0d0d12;
+            color: #00ff9d; padding: 20px; overflow-y: auto;
+            white-space: pre-wrap; font-family: var(--font-code); border: none;
         }
 
         .loading {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            display: none;
-            z-index: 20;
-        }
-
-        @media screen and (max-width: 768px) {
-            header {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-                padding: 10px;
-            }
-            .logo { justify-content: center; margin-bottom: 5px; }
-            .controls { justify-content: center; gap: 5px; }
-            .controls button, .controls select {
-                flex: 1 1 auto; justify-content: center; font-size: 12px; padding: 8px 5px;
-            }
-            .workspace { flex-direction: column; }
-            .editor-container {
-                border-right: none; border-bottom: 4px solid #e2e8f0; height: 50%; flex: none; 
-            }
-            .output-container { height: 50%; flex: 1; }
-            .btn-run { overflow: hidden; text-overflow: ellipsis; }
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); padding: 15px 30px; border-radius: 8px;
+            border: 1px solid var(--accent-glow); display: none; color: var(--accent-glow);
         }
 
         #dropOverlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(37, 99, 235, 0.9);
-            z-index: 999;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            border: 5px dashed white;
-            text-align: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 9, 0.9); z-index: 999; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+            color: var(--accent-glow); border: 3px dashed var(--accent-glow);
         }
-        #dropOverlay h2 { font-size: 1.5rem; pointer-events: none; }
 
+        @media screen and (max-width: 768px) {
+            header { height: auto; padding: 15px; flex-direction: column; gap: 15px; }
+            .workspace { flex-direction: column; height: auto; padding: 10px; }
+            .editor-container { height: 50vh; }
+            .output-container { height: 50vh; }
+        }
     </style>
 </head>
 <body>
 
     <div id="dropOverlay">
-        <h2>Drop File Here</h2>
-        <p>(Supports .html & .py)</p>
+        <h2><i class="fas fa-file-import"></i> Drop Here</h2>
+        <p>Supports .html, .py, .zip</p>
     </div>
 
     <input type="file" id="fileInput" accept=".html,.htm,.py" hidden>
+    <input type="file" id="zipInput" accept=".zip,.rar" hidden>
 
     <header>
         <div class="logo">
-            <span>&lt;/&gt;</span> ProCode
+            <i class="fas fa-code"></i> NEO <span>EDITOR</span>
         </div>
         <div class="controls">
             <select id="modeSelector">
-                <option value="html">HTML</option>
-                <option value="python">Python</option>
+                <option value="html">HTML Mode</option>
+                <option value="python">Python Mode</option>
             </select>
+
+            <div id="subModeContainer">
+                <select id="subModeSelector">
+                    <option value="joined">Joined (Single File)</option>
+                    <option value="separated">Separated (Multi File)</option>
+                </select>
+            </div>
             
-            <button class="btn-upload" onclick="document.getElementById('fileInput').click()" title="Open File">
-                📂 Open
+            <button class="btn-upload" onclick="triggerOpen()" title="Open">
+                <i class="fas fa-folder-open"></i> Open
             </button>
-            <button class="btn-clear" onclick="clearEditor()" title="Clear Editor">
-                🗑 Clear
+            <button class="btn-save" onclick="saveCode()" title="Save">
+                <i class="fas fa-save"></i> Save
             </button>
-            <button class="btn-run" onclick="runCode()" title="Run Code">
-                ▶ Run/Reload
+            <button class="btn-clear" onclick="clearEditor()" title="Clear">
+                <i class="fas fa-trash-alt"></i>
             </button>
-            <button class="btn-save" onclick="saveCode()" title="Save File">
-                💾 Save
+            <button class="btn-run" onclick="runCode()" title="Run">
+                <i class="fas fa-play"></i> RUN
             </button>
-            <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()" title="Fullscreen Preview">
-                ⛶ Fullscreen
+            <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()">
+                <i class="fas fa-expand"></i>
             </button>
         </div>
     </header>
 
     <div class="workspace">
         <div class="editor-container">
-            <div id="editor"></div>
+            <div class="editor-tabs" id="editorTabs">
+                <button class="tab-btn active" onclick="switchTab('html')"><i class="fab fa-html5"></i> HTML</button>
+                <button class="tab-btn" onclick="switchTab('css')"><i class="fab fa-css3-alt"></i> CSS</button>
+                <button class="tab-btn" onclick="switchTab('js')"><i class="fab fa-js"></i> JS</button>
+            </div>
+
+            <div id="wrapperMain" class="ace-wrapper">
+                <div id="editorMain"></div>
+            </div>
+            <div id="wrapperCSS" class="ace-wrapper" style="display:none;">
+                <div id="editorCSS"></div>
+            </div>
+            <div id="wrapperJS" class="ace-wrapper" style="display:none;">
+                <div id="editorJS"></div>
+            </div>
+
             <div class="editor-info-bar">
+                <i class="fas fa-hdd" style="margin-right:5px"></i>
                 <span id="fileSizeInfo">0 Bytes</span>
             </div>
         </div>
 
         <div class="output-container">
             <div class="output-header">
-                <span id="outputTitle">Web Preview</span>
-                <span id="statusText" style="font-weight: normal; font-size: 0.8em; color: #64748b;">Ready</span>
+                <span>
+                    <i class="fas fa-desktop" style="margin-right:8px; color:var(--accent-glow);"></i>
+                    <span id="outputTitle">Web Preview</span>
+                </span>
+                <span id="statusText" style="color: var(--success); font-size: 0.8em; font-family: var(--font-code);">Ready</span>
             </div>
             
-            <iframe id="htmlPreview" 
-                sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin allow-downloads"
-                allow="accelerometer; camera; encrypted-media; display-capture; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; web-share; bluetooth; serial"
-                allowfullscreen="true">
-            </iframe>
-            
+            <iframe id="htmlPreview" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin allow-downloads" allowfullscreen></iframe>
             <pre id="pythonConsole"></pre>
-            <div id="loading" class="loading">Processing...</div>
+            <div id="loading" class="loading"><i class="fas fa-spinner fa-spin"></i> Processing...</div>
         </div>
     </div>
 
     <script>
-        // --- 1. Setup Editor ---
-        const editor = ace.edit("editor");
-        editor.setTheme("ace/theme/monokai");
-        editor.session.setMode("ace/mode/html"); 
-        editor.setOptions({
-            fontSize: "11pt", 
-            enableBasicAutocompletion: true,
-            enableLiveAutocompletion: true,
-            showPrintMargin: false,
-            wrap: true
-        });
+        // --- 1. SETUP EDITORS ---
+        function createEditor(id, mode) {
+            const ed = ace.edit(id);
+            ed.setTheme("ace/theme/monokai");
+            ed.session.setMode("ace/mode/" + mode);
+            ed.setOptions({
+                fontSize: "12pt", fontFamily: "JetBrains Mono, monospace",
+                enableBasicAutocompletion: true, enableLiveAutocompletion: true,
+                showPrintMargin: false, wrap: true
+            });
+            return ed;
+        }
 
+        const editorMain = createEditor("editorMain", "html");
+        const editorCSS = createEditor("editorCSS", "css");
+        const editorJS = createEditor("editorJS", "javascript");
+
+        // --- DOM ELEMENTS ---
         const modeSelector = document.getElementById('modeSelector');
+        const subModeSelector = document.getElementById('subModeSelector');
+        const subModeContainer = document.getElementById('subModeContainer');
+        const editorTabs = document.getElementById('editorTabs');
+        
+        const wrapperMain = document.getElementById('wrapperMain');
+        const wrapperCSS = document.getElementById('wrapperCSS');
+        const wrapperJS = document.getElementById('wrapperJS');
+
         const htmlPreview = document.getElementById('htmlPreview');
         const pythonConsole = document.getElementById('pythonConsole');
         const outputTitle = document.getElementById('outputTitle');
         const statusText = document.getElementById('statusText');
-        const loading = document.getElementById('loading');
-        const dropOverlay = document.getElementById('dropOverlay');
-        const fileInput = document.getElementById('fileInput');
         const fileSizeInfo = document.getElementById('fileSizeInfo');
-        const btnFullscreen = document.getElementById('btnFullscreen');
 
-        // --- 2. File Size Logic ---
-        function updateFileSize() {
-            const content = editor.getValue();
-            const bytes = new Blob([content]).size;
-            let sizeStr = bytes + " B";
-            if (bytes > 1024) sizeStr = (bytes / 1024).toFixed(1) + " KB";
-            if (bytes > 1024 * 1024) sizeStr = (bytes / (1024 * 1024)).toFixed(1) + " MB";
-            fileSizeInfo.textContent = "Size: " + sizeStr;
-        }
-        editor.session.on('change', updateFileSize);
+        // --- 2. LOGIC: SWITCH MODE ---
+        function updateUI() {
+            const mainMode = modeSelector.value;
+            const subMode = subModeSelector.value;
 
-        // --- 3. Mode Switch Logic ---
-        function switchMode(mode, keepContent = false) {
-            modeSelector.value = mode;
-            htmlPreview.srcdoc = "";
-            pythonConsole.textContent = "";
+            // Reset Displays
+            htmlPreview.style.display = 'none';
+            pythonConsole.style.display = 'none';
+            subModeContainer.style.display = 'none';
+            editorTabs.style.display = 'none';
+            wrapperMain.style.display = 'block';
+            wrapperCSS.style.display = 'none';
+            wrapperJS.style.display = 'none';
 
-            if (mode === 'html') {
-                editor.session.setMode("ace/mode/html");
-                if(!keepContent) editor.setValue(""); 
-                htmlPreview.style.display = 'block';
-                pythonConsole.style.display = 'none';
-                outputTitle.textContent = "Web Preview";
-                btnFullscreen.style.display = 'flex'; 
-            } else {
-                editor.session.setMode("ace/mode/python");
-                if(!keepContent) editor.setValue("");
-                htmlPreview.style.display = 'none';
+            if (mainMode === 'python') {
+                // PYTHON MODE
+                editorMain.session.setMode("ace/mode/python");
                 pythonConsole.style.display = 'block';
-                outputTitle.textContent = "Terminal";
-                pythonConsole.textContent = ">>> Waiting for code...";
-                btnFullscreen.style.display = 'none';
+                outputTitle.textContent = "Terminal Output";
+                document.getElementById('btnFullscreen').style.display = 'none';
+            } else {
+                // HTML MODE
+                htmlPreview.style.display = 'block';
+                outputTitle.textContent = "Web Preview";
+                document.getElementById('btnFullscreen').style.display = 'inline-flex';
+                subModeContainer.style.display = 'block'; 
+
+                if (subMode === 'joined') {
+                    // JOINED (Single File)
+                    editorMain.session.setMode("ace/mode/html");
+                } else {
+                    // SEPARATED (Multi Panel)
+                    editorTabs.style.display = 'flex';
+                    switchTab('html'); 
+                }
             }
-            editor.clearSelection();
             updateFileSize();
         }
 
-        modeSelector.addEventListener('change', function() {
-            switchMode(this.value, false);
+        function switchTab(tab) {
+            // Update Tab Buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if(tab === 'html') document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+            if(tab === 'css') document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+            if(tab === 'js') document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
+
+            // Hide all wrappers
+            wrapperMain.style.display = 'none';
+            wrapperCSS.style.display = 'none';
+            wrapperJS.style.display = 'none';
+
+            if (tab === 'html') wrapperMain.style.display = 'block';
+            else if (tab === 'css') wrapperCSS.style.display = 'block';
+            else if (tab === 'js') wrapperJS.style.display = 'block';
+
+            editorMain.resize();
+            editorCSS.resize();
+            editorJS.resize();
+        }
+
+        modeSelector.addEventListener('change', updateUI);
+        subModeSelector.addEventListener('change', updateUI);
+        
+        // Manual tab click handling helper
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if(e.currentTarget.innerText.includes("HTML")) switchTab('html');
+                if(e.currentTarget.innerText.includes("CSS")) switchTab('css');
+                if(e.currentTarget.innerText.includes("JS")) switchTab('js');
+            });
         });
 
-        // --- 4. Fullscreen ---
-        function toggleFullscreen() {
-            const iframe = document.getElementById('htmlPreview');
-            if (!document.fullscreenElement) {
-                if (iframe.requestFullscreen) iframe.requestFullscreen();
-                else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
-                else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
+        // --- 3. RUN CODE ---
+        function runCode() {
+            const mainMode = modeSelector.value;
+            const subMode = subModeSelector.value;
+
+            if (mainMode === 'python') {
+                runPython(editorMain.getValue());
             } else {
-                if (document.exitFullscreen) document.exitFullscreen();
+                let finalCode = "";
+                if (subMode === 'joined') {
+                    finalCode = editorMain.getValue();
+                } else {
+                    const html = editorMain.getValue();
+                    const css = editorCSS.getValue();
+                    const js = editorJS.getValue();
+                    finalCode = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>${css}</style>
+</head>
+<body>
+    ${html}
+    <script>${js}<\/script>
+</body>
+</html>`;
+                }
+                htmlPreview.srcdoc = finalCode;
+                updateStatus("Rendered", "success");
             }
         }
 
-        // --- 5. Upload & Drag Drop ---
-        function handleFile(file) {
-            if (!file) return;
-            const name = file.name.toLowerCase();
-            const reader = new FileReader();
+        // --- 4. FILE HANDLING (OPEN) ---
+        function triggerOpen() {
+            const mainMode = modeSelector.value;
+            const subMode = subModeSelector.value;
+            
+            if (mainMode === 'html' && subMode === 'separated') {
+                // Open ZIP
+                document.getElementById('zipInput').click();
+            } else {
+                // Open Single File
+                document.getElementById('fileInput').click();
+            }
+        }
 
-            reader.onload = function(e) {
+        // Handle Single File
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 const content = e.target.result;
-                if (name.endsWith('.html') || name.endsWith('.htm')) {
-                    switchMode('html', true); 
-                    editor.setValue(content);
-                    statusText.textContent = "Loaded HTML file";
-                } else if (name.endsWith('.py')) {
-                    switchMode('python', true); 
-                    editor.setValue(content);
-                    statusText.textContent = "Loaded Python file";
+                if (file.name.endsWith('.py')) {
+                    modeSelector.value = 'python';
+                    editorMain.setValue(content);
                 } else {
-                    alert("Invalid format! Use .html or .py");
+                    modeSelector.value = 'html';
+                    subModeSelector.value = 'joined';
+                    editorMain.setValue(content);
                 }
-                editor.clearSelection();
+                updateUI();
+                editorMain.clearSelection();
+                updateStatus("Loaded File: " + file.name, "success");
             };
             reader.readAsText(file);
-        }
+            this.value = '';
+        });
 
-        fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); this.value = ''; });
+        // Handle ZIP Input (Replaced Folder)
+        document.getElementById('zipInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        window.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'flex'; });
-        window.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); if (e.clientX === 0 || e.clientY === 0) dropOverlay.style.display = 'none'; });
-        window.addEventListener('drop', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'none'; if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
-        dropOverlay.addEventListener('dragleave', function(e) { dropOverlay.style.display = 'none'; });
-        dropOverlay.addEventListener('drop', function(e) { e.preventDefault(); e.stopPropagation(); dropOverlay.style.display = 'none'; if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+            updateStatus("Reading ZIP...", "process");
 
-        // --- 6. Run & Save ---
-        function runCode() {
-            const mode = modeSelector.value;
-            const code = editor.getValue();
+            JSZip.loadAsync(file).then(function(zip) {
+                // Reset editors
+                editorMain.setValue(""); editorCSS.setValue(""); editorJS.setValue("");
+                
+                // Track promises to know when all files are read
+                let promises = [];
 
-            if (mode === 'html') {
-                htmlPreview.srcdoc = code;
-                statusText.textContent = "Updated: " + new Date().toLocaleTimeString();
+                zip.forEach(function (relativePath, zipEntry) {
+                    if(zipEntry.dir) return; // Skip directories
+                    
+                    const name = zipEntry.name.toLowerCase();
+                    
+                    if (name.endsWith("index.html") || name.endsWith(".html")) {
+                        promises.push(zipEntry.async("string").then(s => editorMain.setValue(s)));
+                    } else if (name.endsWith("style.css") || name.endsWith(".css")) {
+                        promises.push(zipEntry.async("string").then(s => editorCSS.setValue(s)));
+                    } else if (name.endsWith("script.js") || name.endsWith(".js")) {
+                        promises.push(zipEntry.async("string").then(s => editorJS.setValue(s)));
+                    }
+                });
+
+                Promise.all(promises).then(() => {
+                    modeSelector.value = 'html';
+                    subModeSelector.value = 'separated';
+                    updateUI(); // Switch to separated view
+                    updateStatus("Loaded ZIP Project", "success");
+                });
+
+            }, function (e) {
+                alert("Error reading ZIP: " + e.message);
+                updateStatus("Error loading ZIP", "error");
+            });
+
+            this.value = '';
+        });
+
+        // --- 5. FILE HANDLING (SAVE) ---
+        function saveCode() {
+            const mainMode = modeSelector.value;
+            const subMode = subModeSelector.value;
+
+            if (mainMode === 'html' && subMode === 'separated') {
+                // SAVE AS ZIP
+                let folderName = prompt("Enter ZIP Name:", "MyWebProject");
+                if (!folderName) return;
+
+                const zip = new JSZip();
+                zip.file("index.html", editorMain.getValue());
+                zip.file("style.css", editorCSS.getValue());
+                zip.file("script.js", editorJS.getValue());
+
+                zip.generateAsync({type:"blob"}).then(function(content) {
+                    saveAs(content, folderName + ".zip");
+                    updateStatus("Saved ZIP: " + folderName, "success");
+                });
+
             } else {
-                runPython(code);
+                // SAVE AS SINGLE FILE
+                let defaultName = mainMode === 'html' ? "index.html" : "main.py";
+                let filename = prompt("Enter file name:", defaultName);
+                if (!filename) return;
+
+                const code = editorMain.getValue();
+                const type = mainMode === 'html' ? "text/html" : "text/plain";
+                
+                const blob = new Blob([code], { type: type });
+                saveAs(blob, filename);
+                updateStatus("Saved: " + filename, "success");
             }
         }
 
+        // --- HELPERS ---
         function runPython(prog) {
-            pythonConsole.textContent = ""; 
-            loading.style.display = 'block';
-            statusText.textContent = "Running...";
-
+            document.getElementById('loading').style.display = 'block';
+            pythonConsole.textContent = "";
             Sk.configure({
-                output: function(text) { pythonConsole.textContent += text; },
-                read: function(x) {
-                    if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
-                        throw "File not found: '" + x + "'";
+                output: (t) => pythonConsole.textContent += t,
+                read: (x) => {
+                    if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found: '" + x + "'";
                     return Sk.builtinFiles["files"][x];
                 }
             });
-
-            Sk.misceval.asyncToPromise(function() {
-                return Sk.importMainWithBody("<stdin>", false, prog, true);
-            }).then(function(mod) {
-                loading.style.display = 'none';
-                statusText.textContent = "Done";
-                pythonConsole.textContent += "\n\n[Finished]";
-            }, function(err) {
-                loading.style.display = 'none';
-                statusText.textContent = "Error";
-                pythonConsole.textContent += "\nError: " + err.toString();
-            });
+            Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, prog, true))
+                .then(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    pythonConsole.textContent += "\n[Finished]";
+                }, (err) => {
+                    document.getElementById('loading').style.display = 'none';
+                    pythonConsole.textContent += "\nError: " + err.toString();
+                });
         }
 
-        function saveCode() {
-            const mode = modeSelector.value;
-            const code = editor.getValue();
-            let filename = mode === 'html' ? "index.html" : "main.py";
-            let type = mode === 'html' ? "text/html" : "text/plain";
-
-            const blob = new Blob([code], { type: type });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        function updateFileSize() {
+            let content = "";
+            if (modeSelector.value === 'html' && subModeSelector.value === 'separated') {
+                content = editorMain.getValue() + editorCSS.getValue() + editorJS.getValue();
+            } else {
+                content = editorMain.getValue();
+            }
+            const bytes = new Blob([content]).size;
+            let sizeStr = bytes + " B";
+            if (bytes > 1024) sizeStr = (bytes / 1024).toFixed(1) + " KB";
+            document.getElementById('fileSizeInfo').textContent = sizeStr;
         }
 
         function clearEditor() {
-            if(confirm("Are you sure you want to clear the editor?")) {
-                editor.setValue("");
-                htmlPreview.srcdoc = ""; 
-                if(modeSelector.value === 'python') pythonConsole.textContent = "";
+            if(confirm("Clear current workspace?")) {
+                editorMain.setValue("");
+                editorCSS.setValue("");
+                editorJS.setValue("");
+                if(modeSelector.value === 'html') htmlPreview.srcdoc = "";
+                else pythonConsole.textContent = "";
             }
         }
+        
+        function updateStatus(text, type) {
+            let color = type === 'success' ? 'var(--success)' : 'var(--accent-glow)';
+            statusText.innerHTML = `<span style="height:8px;width:8px;border-radius:50%;display:inline-block;background:${color};margin-right:5px"></span>${text}`;
+        }
 
-        // Init
-        switchMode('html', false);
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) htmlPreview.requestFullscreen().catch(e=>{});
+            else document.exitFullscreen();
+        }
+
+        editorMain.session.on('change', updateFileSize);
+        editorCSS.session.on('change', updateFileSize);
+        editorJS.session.on('change', updateFileSize);
+
+        updateUI();
 
     </script>
 </body>
