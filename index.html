@@ -69,7 +69,12 @@
         }
         .logo i { color: var(--accent-glow); }
 
-        .controls { display: flex; gap: 10px; align-items: center; }
+        .controls { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            flex-wrap: wrap; /* Mencegah elemen menembus batas */
+        }
 
         select {
             padding: 8px 15px;
@@ -224,11 +229,54 @@
             color: var(--accent-glow); border: 3px dashed var(--accent-glow);
         }
 
+        /* --- RESPONSIVE LAYOUT (PENTING) --- */
         @media screen and (max-width: 768px) {
-            header { height: auto; padding: 15px; flex-direction: column; gap: 15px; }
-            .workspace { flex-direction: column; height: auto; padding: 10px; }
-            .editor-container { height: 50vh; }
-            .output-container { height: 50vh; }
+            body { 
+                height: auto; 
+                overflow-y: auto; /* Membuka scroll penuh di HP */
+            }
+            header { 
+                height: auto; 
+                padding: 15px; 
+                flex-direction: column; 
+                gap: 15px; 
+            }
+            .logo { 
+                justify-content: center; 
+            }
+            .controls { 
+                width: 100%; 
+                justify-content: center; 
+            }
+            /* Menyesuaikan tombol agar proporsional di HP */
+            .controls > * { 
+                flex: 1 1 auto; 
+                text-align: center;
+                justify-content: center;
+            }
+            #modeSelector { flex: 1 1 100%; }
+            #subModeContainer { 
+                flex: 1 1 100%; 
+                border-left: none; 
+                padding-left: 0; 
+                display: flex;
+            }
+            #subModeContainer select { width: 100%; }
+
+            .workspace { 
+                flex-direction: column; 
+                height: auto; 
+                padding: 10px; 
+            }
+            .editor-container { 
+                height: 50vh; 
+                min-height: 400px;
+                margin-bottom: 10px;
+            }
+            .output-container { 
+                height: 50vh; 
+                min-height: 400px;
+            }
         }
     </style>
 </head>
@@ -375,7 +423,7 @@
                 htmlPreview.style.display = 'block';
                 outputTitle.textContent = "Web Preview";
                 document.getElementById('btnFullscreen').style.display = 'inline-flex';
-                subModeContainer.style.display = 'block'; 
+                subModeContainer.style.display = mainMode === 'html' ? 'flex' : 'block'; // Fixed for flex
 
                 if (subMode === 'joined') {
                     // JOINED (Single File)
